@@ -140,4 +140,8 @@ create policy "receipts are self-writable" on storage.objects
 
 drop policy if exists "receipts are self-deletable" on storage.objects;
 create policy "receipts are self-deletable" on storage.objects
+
+
+
+
   for delete using (bucket_id = 'receipts' and (storage.foldername(name))[1] = auth.uid()::text);
