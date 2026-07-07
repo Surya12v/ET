@@ -1,6 +1,5 @@
 "use client";
 import { useState } from "react";
-import { Wallet } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,14 +19,18 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/40 p-6">
-      <Card className="w-full max-w-sm">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-sidebar p-6">
+      <div
+        className="pointer-events-none absolute inset-0 opacity-40"
+        style={{ background: "radial-gradient(circle at 30% 20%, hsl(var(--sidebar-active) / 0.25), transparent 60%)" }}
+      />
+      <Card className="relative w-full max-w-sm border-sidebar-border bg-card/95 shadow-2xl">
         <CardHeader className="items-center text-center">
-          <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-            <Wallet className="h-6 w-6" />
+          <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-full border border-primary/40 text-primary">
+            <span className="font-serif text-xl italic">L</span>
           </div>
-          <CardTitle className="text-2xl">Expense Tracker</CardTitle>
-          <CardDescription>Sign in to track spending, budgets, and receipts.</CardDescription>
+          <CardTitle className="font-serif text-3xl italic">Ledger</CardTitle>
+          <CardDescription>Sign in to track income, spending, budgets, and savings.</CardDescription>
         </CardHeader>
         <CardContent>
           <Button

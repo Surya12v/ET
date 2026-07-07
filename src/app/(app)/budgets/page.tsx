@@ -92,7 +92,7 @@ export default function BudgetsPage() {
             return (
               <Card key={b.id}>
                 <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-base">
+                  <CardTitle className="font-serif text-lg italic">
                     {b.category ? `${b.category.icon} ${b.category.name}` : "Overall"}
                   </CardTitle>
                   <Button variant="ghost" size="icon" onClick={() => handleDelete(b.id)}>
@@ -101,7 +101,7 @@ export default function BudgetsPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="mb-2 flex items-baseline justify-between text-sm">
-                    <span className={over ? "font-semibold text-destructive" : "font-semibold"}>
+                    <span className={over ? "tabular font-semibold text-destructive" : "tabular font-semibold"}>
                       {formatCurrency(spent, currency)}
                     </span>
                     <span className="text-muted-foreground"> of {formatCurrency(b.amount, currency)}</span>

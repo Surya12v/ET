@@ -20,7 +20,7 @@ export function CategoryPieChart({
             <Cell key={i} fill={d.color} />
           ))}
         </Pie>
-        <Tooltip formatter={(value: number) => formatCurrency(value, currency)} />
+        <Tooltip formatter={(value: number) => formatCurrency(value, currency)} contentStyle={{ borderRadius: 6, border: "1px solid hsl(var(--border))", fontSize: 13 }} />
         <Legend />
       </PieChart>
     </ResponsiveContainer>

@@ -87,9 +87,9 @@ export default function CategoriesPage() {
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader>
-                        <AlertDialogTitle>Delete "{c.name}"?</AlertDialogTitle>
+                        <AlertDialogTitle>Delete &quot;{c.name}&quot;?</AlertDialogTitle>
                         <AlertDialogDescription>
-                          Expenses in this category will become uncategorized. This can't be undone.
+                          Expenses in this category will become uncategorized. This can&apos;t be undone.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>

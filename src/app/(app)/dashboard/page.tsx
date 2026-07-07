@@ -1,12 +1,15 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, PiggyBank, Repeat, TrendingUp, Wallet } from "lucide-react";
+import Link from "next/link";
+import { Loader2, PiggyBank, Repeat, TrendingUp, Wallet2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { CategoryPieChart } from "@/components/dashboard/category-pie-chart";
-import { MonthlyTrendChart } from "@/components/dashboard/monthly-trend-chart";
+import { IncomeExpenseChart } from "@/components/trends/income-expense-chart";
 import { formatCurrency } from "@/lib/currency";
-import type { Budget, Expense } from "@/lib/types";
+import { monthlySeries } from "@/lib/analytics";
+import type { Budget, Expense, Income } from "@/lib/types";
 
 function startOfMonth(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), 1);
@@ -14,6 +17,7 @@ function startOfMonth(d: Date) {
 
 export default function DashboardPage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [income, setIncome] = useState<Income[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [currency, setCurrency] = useState("INR");
   const [loading, setLoading] = useState(true);
@@ -22,19 +26,25 @@ export default function DashboardPage() {
     (async () => {
       const supabase = createClient();
       const sixMonthsAgo = new Date();
-      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 11);
       sixMonthsAgo.setDate(1);
 
-      const [{ data: exp }, { data: b }, { data: profile }] = await Promise.all([
+      const [{ data: exp }, { data: inc }, { data: b }, { data: profile }] = await Promise.all([
         supabase
           .from("expenses")
           .select("*, category:categories(*)")
           .gte("expense_date", sixMonthsAgo.toISOString().slice(0, 10))
           .order("expense_date", { ascending: false }),
+        supabase
+          .from("income")
+          .select("*")
+          .gte("income_date", sixMonthsAgo.toISOString().slice(0, 10))
+          .order("income_date", { ascending: false }),
         supabase.from("budgets").select("*, category:categories(*)"),
         supabase.from("profiles").select("default_currency").maybeSingle(),
       ]);
       setExpenses(exp ?? []);
+      setIncome(inc ?? []);
       setBudgets(b ?? []);
       setCurrency(profile?.default_currency ?? "INR");
       setLoading(false);
@@ -45,8 +55,11 @@ export default function DashboardPage() {
   const monthStart = startOfMonth(now).toISOString().slice(0, 10);
 
   const thisMonthExpenses = useMemo(() => expenses.filter((e) => e.expense_date >= monthStart), [expenses, monthStart]);
+  const thisMonthIncome = useMemo(() => income.filter((i) => i.income_date >= monthStart), [income, monthStart]);
   const totalThisMonth = thisMonthExpenses.reduce((s, e) => s + e.amount, 0);
-  const recurringCount = expenses.filter((e) => e.is_recurring && !e.parent_recurring_id).length;
+  const incomeThisMonth = thisMonthIncome.reduce((s, i) => s + i.amount, 0);
+  const savingsThisMonth = incomeThisMonth - totalThisMonth;
+  const recurringCount = expenses.filter((e) => e.is_recurring && !e.parent_recurring_id).length + income.filter((i) => i.is_recurring && !i.parent_recurring_id).length;
 
   const overallBudget = budgets.find((b) => !b.category_id);
   const budgetRemaining = overallBudget ? overallBudget.amount - totalThisMonth : null;
@@ -55,24 +68,14 @@ export default function DashboardPage() {
     const map = new Map<string, { name: string; value: number; color: string }>();
     for (const e of thisMonthExpenses) {
       const key = e.category?.name ?? "Uncategorized";
-      const color = e.category?.color ?? "#64748b";
+      const color = e.category?.color ?? "#8A8272";
       const existing = map.get(key);
       map.set(key, { name: key, color, value: (existing?.value ?? 0) + e.amount });
     }
     return Array.from(map.values()).sort((a, b) => b.value - a.value);
   }, [thisMonthExpenses]);
 
-  const trendData = useMemo(() => {
-    const months: { month: string; total: number }[] = [];
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const label = d.toLocaleString(undefined, { month: "short" });
-      const monthKey = d.toISOString().slice(0, 7);
-      const total = expenses.filter((e) => e.expense_date.startsWith(monthKey)).reduce((s, e) => s + e.amount, 0);
-      months.push({ month: label, total: Math.round(total * 100) / 100 });
-    }
-    return months;
-  }, [expenses, now]);
+  const series = useMemo(() => monthlySeries(expenses, income, 6), [expenses, income]);
 
   const topCategory = pieData[0];
 
@@ -89,54 +92,68 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">This month</CardTitle>
-            <Wallet className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Spent this month</CardTitle>
+            <Wallet2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent className="text-2xl font-bold">{formatCurrency(totalThisMonth, currency)}</CardContent>
+          <CardContent className="tabular font-serif text-2xl italic">{formatCurrency(totalThisMonth, currency)}</CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Saved this month</CardTitle>
+            <PiggyBank className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent className={`tabular font-serif text-2xl italic ${savingsThisMonth < 0 ? "text-destructive" : "text-positive"}`}>
+            {formatCurrency(savingsThisMonth, currency)}
+          </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Top category</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent className="text-2xl font-bold">{topCategory ? topCategory.name : "—"}</CardContent>
+          <CardContent className="font-serif text-2xl italic">{topCategory ? topCategory.name : "—"}</CardContent>
         </Card>
         <Card>
           <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Overall budget left</CardTitle>
-            <PiggyBank className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent className={`text-2xl font-bold ${budgetRemaining !== null && budgetRemaining < 0 ? "text-destructive" : ""}`}>
-            {budgetRemaining !== null ? formatCurrency(budgetRemaining, currency) : "Not set"}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Recurring expenses</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Recurring entries</CardTitle>
             <Repeat className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent className="text-2xl font-bold">{recurringCount}</CardContent>
+          <CardContent className="tabular font-serif text-2xl italic">{recurringCount}</CardContent>
         </Card>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
+          <CardHeader className="flex-row items-center justify-between space-y-0">
+            <CardTitle className="font-serif text-lg italic">Income vs expenses — 6 months</CardTitle>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/trends">Full trends →</Link>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <IncomeExpenseChart data={series} currency={currency} />
+          </CardContent>
+        </Card>
+        <Card>
           <CardHeader>
-            <CardTitle className="text-base">Spending by category (this month)</CardTitle>
+            <CardTitle className="font-serif text-lg italic">Spending by category</CardTitle>
           </CardHeader>
           <CardContent>
             <CategoryPieChart data={pieData} currency={currency} />
           </CardContent>
         </Card>
+      </div>
+
+      {budgetRemaining !== null && (
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Last 6 months</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <MonthlyTrendChart data={trendData} currency={currency} />
+          <CardContent className="flex items-center justify-between p-4">
+            <span className="text-sm text-muted-foreground">Overall budget remaining this month</span>
+            <span className={`tabular font-serif text-lg italic ${budgetRemaining < 0 ? "text-destructive" : "text-positive"}`}>
+              {formatCurrency(budgetRemaining, currency)}
+            </span>
           </CardContent>
         </Card>
-      </div>
+      )}
     </div>
   );
 }

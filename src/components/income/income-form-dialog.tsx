@@ -17,22 +17,17 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ReceiptUploader } from "@/components/expenses/receipt-uploader";
-import { CURRENCIES, PAYMENT_METHODS, RECURRENCE_INTERVALS } from "@/lib/constants";
-import type { Category, Expense } from "@/lib/types";
+import { CURRENCIES, INCOME_SOURCES, RECURRENCE_INTERVALS } from "@/lib/constants";
+import type { Income } from "@/lib/types";
 import { toast } from "sonner";
 
-const UNCATEGORIZED = "uncategorized";
-
-export function ExpenseFormDialog({
-  categories,
-  expense,
+export function IncomeFormDialog({
+  income,
   defaultCurrency = "INR",
   onSaved,
   trigger,
 }: {
-  categories: Category[];
-  expense?: Expense | null;
+  income?: Income | null;
   defaultCurrency?: string;
   onSaved: () => void;
   trigger?: React.ReactNode;
@@ -42,41 +37,32 @@ export function ExpenseFormDialog({
 
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState(defaultCurrency);
-  const [categoryId, setCategoryId] = useState<string>(UNCATEGORIZED);
+  const [source, setSource] = useState<string>(INCOME_SOURCES[0]);
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [merchant, setMerchant] = useState("");
-  const [description, setDescription] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<string>(PAYMENT_METHODS[0]);
-  const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
+  const [notes, setNotes] = useState("");
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurrenceInterval, setRecurrenceInterval] = useState<string>("monthly");
 
   useEffect(() => {
     if (!open) return;
-    if (expense) {
-      setAmount(String(expense.amount));
-      setCurrency(expense.currency);
-      setCategoryId(expense.category_id ?? UNCATEGORIZED);
-      setDate(expense.expense_date);
-      setMerchant(expense.merchant ?? "");
-      setDescription(expense.description ?? "");
-      setPaymentMethod(expense.payment_method ?? PAYMENT_METHODS[0]);
-      setReceiptUrl(expense.receipt_url);
-      setIsRecurring(expense.is_recurring);
-      setRecurrenceInterval(expense.recurrence_interval ?? "monthly");
+    if (income) {
+      setAmount(String(income.amount));
+      setCurrency(income.currency);
+      setSource(income.source);
+      setDate(income.income_date);
+      setNotes(income.notes ?? "");
+      setIsRecurring(income.is_recurring);
+      setRecurrenceInterval(income.recurrence_interval ?? "monthly");
     } else {
       setAmount("");
       setCurrency(defaultCurrency);
-      setCategoryId(UNCATEGORIZED);
+      setSource(INCOME_SOURCES[0]);
       setDate(new Date().toISOString().slice(0, 10));
-      setMerchant("");
-      setDescription("");
-      setPaymentMethod(PAYMENT_METHODS[0]);
-      setReceiptUrl(null);
+      setNotes("");
       setIsRecurring(false);
       setRecurrenceInterval("monthly");
     }
-  }, [open, expense, defaultCurrency]);
+  }, [open, income, defaultCurrency]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -95,24 +81,21 @@ export function ExpenseFormDialog({
         user_id: user.id,
         amount: parsedAmount,
         currency,
-        category_id: categoryId === UNCATEGORIZED ? null : categoryId,
-        expense_date: date,
-        merchant: merchant || null,
-        description: description || null,
-        payment_method: paymentMethod || null,
-        receipt_url: receiptUrl,
+        source,
+        income_date: date,
+        notes: notes || null,
         is_recurring: isRecurring,
         recurrence_interval: isRecurring ? recurrenceInterval : null,
       };
 
-      if (expense) {
-        const { error } = await supabase.from("expenses").update(payload).eq("id", expense.id);
+      if (income) {
+        const { error } = await supabase.from("income").update(payload).eq("id", income.id);
         if (error) throw error;
-        toast.success("Expense updated");
+        toast.success("Income updated");
       } else {
-        const { error } = await supabase.from("expenses").insert(payload);
+        const { error } = await supabase.from("income").insert(payload);
         if (error) throw error;
-        toast.success("Expense added");
+        toast.success("Income added");
       }
 
       setOpen(false);
@@ -129,14 +112,14 @@ export function ExpenseFormDialog({
       <DialogTrigger asChild>
         {trigger ?? (
           <Button>
-            <Plus className="mr-2 h-4 w-4" /> Add expense
+            <Plus className="mr-2 h-4 w-4" /> Add income
           </Button>
         )}
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle className="font-serif text-2xl italic">{expense ? "Edit expense" : "Add expense"}</DialogTitle>
-          <DialogDescription>Fill in the details below.</DialogDescription>
+          <DialogTitle className="font-serif text-2xl italic">{income ? "Edit income" : "Add income"}</DialogTitle>
+          <DialogDescription>Salary, freelance work, or any other money coming in.</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-3 gap-3">
@@ -159,13 +142,12 @@ export function ExpenseFormDialog({
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label>Category</Label>
-              <Select value={categoryId} onValueChange={setCategoryId}>
+              <Label>Source</Label>
+              <Select value={source} onValueChange={setSource}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={UNCATEGORIZED}>Uncategorized</SelectItem>
-                  {categories.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.icon} {c.name}</SelectItem>
+                  {INCOME_SOURCES.map((s) => (
+                    <SelectItem key={s} value={s}>{s}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -176,33 +158,15 @@ export function ExpenseFormDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="merchant">Merchant</Label>
-              <Input id="merchant" placeholder="e.g. Uber, Trader Joe's" value={merchant} onChange={(e) => setMerchant(e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Payment method</Label>
-              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {PAYMENT_METHODS.map((m) => (
-                    <SelectItem key={m} value={m}>{m}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
           <div className="space-y-1.5">
-            <Label htmlFor="description">Notes</Label>
-            <Textarea id="description" placeholder="Optional details" value={description} onChange={(e) => setDescription(e.target.value)} />
+            <Label htmlFor="notes">Notes</Label>
+            <Textarea id="notes" placeholder="Optional details" value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
 
           <div className="flex items-center justify-between rounded-md border p-3">
             <div>
-              <Label htmlFor="recurring">Recurring expense</Label>
-              <p className="text-xs text-muted-foreground">Auto-generate this expense on a schedule.</p>
+              <Label htmlFor="recurring">Recurring income</Label>
+              <p className="text-xs text-muted-foreground">e.g. a monthly salary — auto-generate on a schedule.</p>
             </div>
             <Switch id="recurring" checked={isRecurring} onCheckedChange={setIsRecurring} />
           </div>
@@ -220,17 +184,10 @@ export function ExpenseFormDialog({
             </div>
           )}
 
-          <div className="space-y-1.5">
-            <Label>Receipt</Label>
-            <div className="flex flex-wrap items-center gap-2">
-              <ReceiptUploader value={receiptUrl} onChange={setReceiptUrl} />
-            </div>
-          </div>
-
           <DialogFooter>
             <Button type="submit" disabled={saving}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {expense ? "Save changes" : "Add expense"}
+              {income ? "Save changes" : "Add income"}
             </Button>
           </DialogFooter>
         </form>

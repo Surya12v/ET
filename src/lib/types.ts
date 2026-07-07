@@ -36,6 +36,20 @@ export interface Budget {
   category?: Category | null;
 }
 
+export interface Income {
+  id: string;
+  user_id: string;
+  source: string;
+  amount: number;
+  currency: string;
+  notes: string | null;
+  income_date: string;
+  is_recurring: boolean;
+  recurrence_interval: RecurrenceInterval | null;
+  parent_recurring_id: string | null;
+  created_at: string;
+}
+
 export interface Profile {
   id: string;
   email: string | null;

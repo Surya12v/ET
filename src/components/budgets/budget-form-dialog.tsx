@@ -83,7 +83,7 @@ export function BudgetFormDialog({
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{budget ? "Edit budget" : "New monthly budget"}</DialogTitle>
+          <DialogTitle className="font-serif text-2xl italic">{budget ? "Edit budget" : "New monthly budget"}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">

@@ -86,6 +86,30 @@ drop policy if exists "budgets crud own" on public.budgets;
 create policy "budgets crud own" on public.budgets
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+
+-- ========== income ==========
+create table if not exists public.income (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  source text not null default 'Other',
+  amount numeric(12, 2) not null check (amount >= 0),
+  currency text not null default 'INR',
+  notes text,
+  income_date date not null default current_date,
+  is_recurring boolean not null default false,
+  recurrence_interval text check (recurrence_interval in ('weekly', 'monthly', 'yearly')),
+  parent_recurring_id uuid references public.income(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists income_user_date_idx on public.income (user_id, income_date desc);
+
+alter table public.income enable row level security;
+
+drop policy if exists "income crud own" on public.income;
+create policy "income crud own" on public.income
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
 -- ========== auto-provision profile + default categories on signup ==========
 create or replace function public.handle_new_user()
 returns trigger
@@ -140,8 +164,4 @@ create policy "receipts are self-writable" on storage.objects
 
 drop policy if exists "receipts are self-deletable" on storage.objects;
 create policy "receipts are self-deletable" on storage.objects
-
-
-
-
   for delete using (bucket_id = 'receipts' and (storage.foldername(name))[1] = auth.uid()::text);

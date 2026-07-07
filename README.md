@@ -1,17 +1,18 @@
-# Expense Tracker
+# Ledger — Expense & Income Tracker
 
-A Next.js 14 (App Router + TypeScript) expense tracker with Supabase auth (Google login) and a shadcn/ui-style component kit built on Tailwind + Radix.
+A Next.js 14 (App Router + TypeScript) personal finance tracker with Supabase auth (Google login). Styled as a distinct "premium ledger" design system (ivory/navy + bronze-gold palette, serif+sans type pairing, an always-dark sidebar) rather than a default component-library look.
 
 ## Features
 
-- Google sign-in via Supabase Auth — all data is scoped to the signed-in user's ID with row-level security, so each person only ever sees their own data
-- Dashboard: monthly total, top category, overall budget remaining, recurring count, category breakdown pie chart, 6‑month trend chart
-- Expenses: add/edit/delete, search, filter by category and date range, CSV export
-- Receipts: upload a photo of a receipt from your device (stored in Supabase Storage)
-- Categories: custom categories with color + emoji icon
-- Budgets: monthly limit per category (or an overall limit), with progress bars and over‑budget warnings
-- Recurring expenses: mark an expense as weekly/monthly/yearly, then generate the current period's copy with one click
-- Settings: default currency, sign out
+- Google sign-in via Supabase Auth — all data is scoped to the signed-in user's ID with row-level security
+- **Dashboard**: monthly spend, monthly savings, top category, recurring count, 6-month income-vs-expense chart, category breakdown
+- **Income**: log salary or any other income, one-off or recurring (weekly/monthly/yearly) — mark your salary as recurring and it'll show up for one-click generation each period
+- **Expenses**: add/edit/delete, search, filter by category and date range, CSV export, receipt photo upload
+- **Trends**: 12-month income/expense/savings chart, savings rate, all-time net savings, month-over-month and year-over-year comparison cards, and a custom date-range A-vs-B comparator
+- **Categories**: custom categories with color + emoji icon
+- **Budgets**: monthly limit per category (or overall), with progress bars and over-budget warnings
+- **Recurring**: one place to see every recurring expense and income template and generate what's due this period
+- **Settings**: default currency, sign out
 - Dark mode
 
 ## 1. Install
@@ -27,26 +28,29 @@ npm run dev
 
 Open your Supabase project → **SQL Editor** → paste in `supabase/schema.sql` → run it.
 
-This creates `profiles`, `categories`, `expenses`, `budgets`, row-level security policies so users can only see their own data, a trigger that seeds 10 default categories for every new user, and a public `receipts` storage bucket for uploaded receipt photos.
+This creates `profiles`, `categories`, `expenses`, `budgets`, `income`, row-level security policies, a trigger that seeds 10 default categories for every new user, and a public `receipts` storage bucket.
+
+> Already ran an older version of this schema? Just add the new table by running the `income` block from `supabase/schema.sql` (or the whole file again — everything uses `create table if not exists` / `drop policy if exists`, so it's safe to re-run).
 
 ## 3. Enable Google sign-in in Supabase
 
 Supabase Dashboard → **Authentication → Providers → Google**:
 
 1. Create an OAuth 2.0 Client ID (Web application) in the [Google Cloud Console](https://console.cloud.google.com/apis/credentials).
-2. In that Google OAuth client, add this **Authorized redirect URI**: `https://uafmfvcvmigqkurdiket.supabase.co/auth/v1/callback` (your Supabase project's own callback — Google redirects there, then Supabase redirects into the app).
-3. Paste that Client ID and Client Secret into Supabase's Google provider settings, and enable the provider.
+2. Add this **Authorized redirect URI** to that Google OAuth client: `https://uafmfvcvmigqkurdiket.supabase.co/auth/v1/callback`.
+3. Paste the Client ID and Client Secret into Supabase's Google provider settings, and enable the provider.
 
-No extra Google API scopes or verification are needed — this only requests the standard sign-in scopes (email/profile), so you won't hit the "unverified app" warning or need Google's review process.
+Only standard sign-in scopes (email/profile) are requested, so there's no "unverified app" warning or Google review needed.
 
 ## 4. Redirect URLs
 
-Supabase Dashboard → **Authentication → URL Configuration** → add your app's redirect URLs:
+Supabase Dashboard → **Authentication → URL Configuration** → add:
 - `http://localhost:3000/auth/callback` for local dev
 - your production URL + `/auth/callback`, once deployed
 
 ## Notes
 
-- Receipts are stored in the `receipts` Supabase Storage bucket (public bucket, one folder per user, path-scoped by RLS). Switch it to private + signed URLs later if you'd rather receipts not be reachable by anyone with the link.
-- Recurring expenses work by keeping the original expense as a "template" (`is_recurring = true`); the Recurring tab lets you generate that period's copy, which is inserted as a normal expense row linked back via `parent_recurring_id`.
-- All data access uses the Supabase anon/publishable key from the browser and server, protected by row-level security — no service role key is used or needed.
+- "Savings" = income minus expenses for a period. The Trends page is where all the comparison/analysis lives.
+- Recurring works the same way for both Income and Expenses: the original entry is the "template" (`is_recurring = true`); the Recurring tab generates that period's copy, linked back via `parent_recurring_id`.
+- Receipts are stored in the `receipts` Supabase Storage bucket (public bucket, one folder per user, path-scoped by RLS).
+- All data access uses the Supabase anon/publishable key, protected by row-level security — no service role key is used or needed.

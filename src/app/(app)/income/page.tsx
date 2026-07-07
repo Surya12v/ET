@@ -19,34 +19,32 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ExpenseFormDialog } from "@/components/expenses/expense-form-dialog";
+import { IncomeFormDialog } from "@/components/income/income-form-dialog";
 import { formatCurrency } from "@/lib/currency";
-import { exportExpensesToCsv } from "@/lib/csv";
-import type { Category, Expense } from "@/lib/types";
+import { exportIncomeToCsv } from "@/lib/csv";
+import { INCOME_SOURCES } from "@/lib/constants";
+import type { Income } from "@/lib/types";
 import { toast } from "sonner";
 
 const ALL = "all";
 
-export default function ExpensesPage() {
+export default function IncomePage() {
   const [loading, setLoading] = useState(true);
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [income, setIncome] = useState<Income[]>([]);
+  const [defaultCurrency, setDefaultCurrency] = useState("INR");
   const [search, setSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState(ALL);
+  const [sourceFilter, setSourceFilter] = useState(ALL);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [defaultCurrency, setDefaultCurrency] = useState("INR");
 
   async function load() {
     setLoading(true);
     const supabase = createClient();
-    const [{ data: exp }, { data: cats }, { data: profile }] = await Promise.all([
-      supabase.from("expenses").select("*, category:categories(*)").order("expense_date", { ascending: false }),
-      supabase.from("categories").select("*").order("name"),
+    const [{ data: inc }, { data: profile }] = await Promise.all([
+      supabase.from("income").select("*").order("income_date", { ascending: false }),
       supabase.from("profiles").select("default_currency").maybeSingle(),
     ]);
-    setExpenses(exp ?? []);
-    setCategories(cats ?? []);
+    setIncome(inc ?? []);
     setDefaultCurrency(profile?.default_currency ?? "INR");
     setLoading(false);
   }
@@ -56,28 +54,28 @@ export default function ExpensesPage() {
   }, []);
 
   const filtered = useMemo(() => {
-    return expenses.filter((e) => {
-      if (categoryFilter !== ALL && e.category_id !== categoryFilter) return false;
-      if (from && e.expense_date < from) return false;
-      if (to && e.expense_date > to) return false;
+    return income.filter((i) => {
+      if (sourceFilter !== ALL && i.source !== sourceFilter) return false;
+      if (from && i.income_date < from) return false;
+      if (to && i.income_date > to) return false;
       if (search) {
-        const haystack = `${e.merchant ?? ""} ${e.description ?? ""}`.toLowerCase();
+        const haystack = `${i.source} ${i.notes ?? ""}`.toLowerCase();
         if (!haystack.includes(search.toLowerCase())) return false;
       }
       return true;
     });
-  }, [expenses, categoryFilter, from, to, search]);
+  }, [income, sourceFilter, from, to, search]);
 
-  const total = filtered.reduce((sum, e) => sum + e.amount, 0);
+  const total = filtered.reduce((sum, i) => sum + i.amount, 0);
 
   async function handleDelete(id: string) {
     const supabase = createClient();
-    const { error } = await supabase.from("expenses").delete().eq("id", id);
+    const { error } = await supabase.from("income").delete().eq("id", id);
     if (error) {
       toast.error(error.message);
       return;
     }
-    toast.success("Expense deleted");
+    toast.success("Income deleted");
     load();
   }
 
@@ -86,14 +84,17 @@ export default function ExpensesPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-sm text-muted-foreground">
-            {filtered.length} expense{filtered.length === 1 ? "" : "s"} · <span className="tabular font-serif italic">{formatCurrency(total, filtered[0]?.currency ?? "INR")}</span>
+            {filtered.length} entr{filtered.length === 1 ? "y" : "ies"} ·{" "}
+            <span className="tabular font-serif italic text-positive">
+              {formatCurrency(total, filtered[0]?.currency ?? defaultCurrency)}
+            </span>
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => exportExpensesToCsv(filtered)}>
+          <Button variant="outline" onClick={() => exportIncomeToCsv(filtered)}>
             <Download className="mr-2 h-4 w-4" /> Export CSV
           </Button>
-          <ExpenseFormDialog categories={categories} defaultCurrency={defaultCurrency} onSaved={load} />
+          <IncomeFormDialog defaultCurrency={defaultCurrency} onSaved={load} />
         </div>
       </div>
 
@@ -103,17 +104,17 @@ export default function ExpensesPage() {
             <label className="text-xs font-medium text-muted-foreground">Search</label>
             <div className="relative">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input className="pl-8" placeholder="Merchant or note..." value={search} onChange={(e) => setSearch(e.target.value)} />
+              <Input className="pl-8" placeholder="Source or note..." value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Category</label>
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+            <label className="text-xs font-medium text-muted-foreground">Source</label>
+            <Select value={sourceFilter} onValueChange={setSourceFilter}>
+              <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value={ALL}>All categories</SelectItem>
-                {categories.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.icon} {c.name}</SelectItem>
+                <SelectItem value={ALL}>All sources</SelectItem>
+                {INCOME_SOURCES.map((s) => (
+                  <SelectItem key={s} value={s}>{s}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -126,8 +127,8 @@ export default function ExpensesPage() {
             <label className="text-xs font-medium text-muted-foreground">To</label>
             <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
           </div>
-          {(search || categoryFilter !== ALL || from || to) && (
-            <Button variant="ghost" onClick={() => { setSearch(""); setCategoryFilter(ALL); setFrom(""); setTo(""); }}>
+          {(search || sourceFilter !== ALL || from || to) && (
+            <Button variant="ghost" onClick={() => { setSearch(""); setSourceFilter(ALL); setFrom(""); setTo(""); }}>
               Clear
             </Button>
           )}
@@ -141,45 +142,33 @@ export default function ExpensesPage() {
               <Loader2 className="h-4 w-4 animate-spin" /> Loading...
             </div>
           ) : filtered.length === 0 ? (
-            <p className="p-10 text-center text-sm text-muted-foreground">No expenses match these filters.</p>
+            <p className="p-10 text-center text-sm text-muted-foreground">No income entries match these filters.</p>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Merchant / Notes</TableHead>
-                  <TableHead>Payment</TableHead>
+                  <TableHead>Source</TableHead>
+                  <TableHead>Notes</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
                   <TableHead className="w-[100px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((e) => (
-                  <TableRow key={e.id}>
-                    <TableCell className="whitespace-nowrap">{e.expense_date}</TableCell>
+                {filtered.map((i) => (
+                  <TableRow key={i.id}>
+                    <TableCell className="whitespace-nowrap">{i.income_date}</TableCell>
                     <TableCell>
-                      {e.category ? (
-                        <Badge style={{ backgroundColor: e.category.color, color: "white", borderColor: "transparent" }}>
-                          {e.category.icon} {e.category.name}
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline">Uncategorized</Badge>
-                      )}
-                      {e.is_recurring && <Badge variant="secondary" className="ml-1">Recurring</Badge>}
+                      <Badge variant="secondary">{i.source}</Badge>
+                      {i.is_recurring && <Badge variant="outline" className="ml-1">Recurring</Badge>}
                     </TableCell>
-                    <TableCell>
-                      <div className="font-medium">{e.merchant || "—"}</div>
-                      {e.description && <div className="text-xs text-muted-foreground">{e.description}</div>}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{e.payment_method || "—"}</TableCell>
-                    <TableCell className="text-right tabular font-medium">{formatCurrency(e.amount, e.currency)}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{i.notes || "—"}</TableCell>
+                    <TableCell className="text-right tabular font-medium text-positive">{formatCurrency(i.amount, i.currency)}</TableCell>
                     <TableCell>
                       <div className="flex justify-end gap-1">
-                        <ExpenseFormDialog
-                          categories={categories}
+                        <IncomeFormDialog
+                          income={i}
                           defaultCurrency={defaultCurrency}
-                          expense={e}
                           onSaved={load}
                           trigger={
                             <Button variant="ghost" size="icon">
@@ -195,12 +184,12 @@ export default function ExpensesPage() {
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
-                              <AlertDialogTitle>Delete this expense?</AlertDialogTitle>
+                              <AlertDialogTitle>Delete this income entry?</AlertDialogTitle>
                               <AlertDialogDescription>This can&apos;t be undone.</AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                               <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => handleDelete(e.id)}>Delete</AlertDialogAction>
+                              <AlertDialogAction onClick={() => handleDelete(i.id)}>Delete</AlertDialogAction>
                             </AlertDialogFooter>
                           </AlertDialogContent>
                         </AlertDialog>

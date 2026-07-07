@@ -1,4 +1,4 @@
-import type { Expense, RecurrenceInterval } from "./types";
+import type { Expense, Income, RecurrenceInterval } from "./types";
 
 function periodKey(date: Date, interval: RecurrenceInterval) {
   if (interval === "yearly") return `${date.getFullYear()}`;
@@ -10,16 +10,29 @@ function periodKey(date: Date, interval: RecurrenceInterval) {
   return `${date.getFullYear()}-${date.getMonth()}`;
 }
 
-// Returns true if `template` is still due to be generated for the current
-// period (this month / week / year), based on its own date plus any
-// already-generated instances.
-export function isDueThisPeriod(template: Expense, instances: Expense[]) {
+interface RecurringLike {
+  id: string;
+  recurrence_interval: RecurrenceInterval | null;
+  parent_recurring_id: string | null;
+}
+
+// Generic core: returns true if `template` is still due to be generated for
+// the current period (this week / month / year).
+function isDueGeneric<T extends RecurringLike>(template: T, instances: T[], dateOf: (item: T) => string) {
   if (!template.recurrence_interval) return false;
   const now = new Date();
   const currentKey = periodKey(now, template.recurrence_interval);
-  const templateKey = periodKey(new Date(template.expense_date), template.recurrence_interval);
+  const templateKey = periodKey(new Date(dateOf(template)), template.recurrence_interval);
   if (templateKey === currentKey) return false; // the template itself already counts for this period
   return !instances.some(
-    (i) => i.parent_recurring_id === template.id && periodKey(new Date(i.expense_date), template.recurrence_interval!) === currentKey
+    (i) => i.parent_recurring_id === template.id && periodKey(new Date(dateOf(i)), template.recurrence_interval!) === currentKey
   );
+}
+
+export function isExpenseDue(template: Expense, instances: Expense[]) {
+  return isDueGeneric(template, instances, (e) => e.expense_date);
+}
+
+export function isIncomeDue(template: Income, instances: Income[]) {
+  return isDueGeneric(template, instances, (i) => i.income_date);
 }
